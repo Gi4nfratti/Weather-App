@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:weather/utils/appRoutes.dart';
 import 'package:weather/views/home_page.dart';
+import 'package:weather/views/onboarding_page.dart';
 
-void main() {
-  runApp(const MyApp());
+Future main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  final showHome = prefs.getBool('showHome') ?? false;
+
+  runApp(MyApp(showHome: showHome));
 }
 
 /*
@@ -16,7 +23,11 @@ void main() {
 */
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool showHome;
+  const MyApp({
+    Key? key,
+    required this.showHome,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +46,7 @@ class MyApp extends StatelessWidget {
         )
       ),
       debugShowCheckedModeBanner: false,
+      home: showHome ? HomePage() : OnboardingPage(),
       routes: {
         AppRoutes.HOME: (context) => HomePage(),
       },
