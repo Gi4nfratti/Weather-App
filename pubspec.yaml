@@ -38,6 +38,7 @@ dependencies:
   intl: ^0.18.1
   smooth_page_indicator: ^1.0.0+2
   shared_preferences: ^2.0.12
+  http: ^0.13.3
 
 dev_dependencies:
   flutter_test:

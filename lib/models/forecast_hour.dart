@@ -1,9 +1,9 @@
-import 'condition.dart';
+import 'package:flutter/material.dart';
 
 class ForecastHour {
-  final Condition condition;
-  final double avgTemp;
-  final double wind;
+  final String time;
+  final Icon icon;
+  final String avgTemp;
 
-  ForecastHour({required this.condition, this.avgTemp = 0, this.wind = 0});
+  ForecastHour({required this.time, required this.icon, required this.avgTemp});
 }
