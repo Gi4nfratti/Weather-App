@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:weather/models/forecast_hour.dart';
+import 'package:weather/utils/appRoutes.dart';
 
 class HomePage extends StatefulWidget {
   HomePage({super.key});
@@ -24,6 +25,24 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      persistentFooterButtons: [
+        IconButton(
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.NEXT_DAYS),
+            icon: Icon(
+              Icons.calendar_month_outlined,
+              color: Colors.white,
+              size: 32,
+            )),
+        IconButton(
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.COUNTRIES),
+            icon: Icon(
+              Icons.public_rounded,
+              color: Colors.white,
+              size: 32,
+            )),
+      ],
       body: SafeArea(
         child: Container(
           decoration: BoxDecoration(
@@ -126,7 +145,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> getTodaysWeather() async {
     await http
         .get(Uri.parse(
-            'http://api.weatherapi.com/v1/forecast.json?key=f54f33c40a3f4c27b0431302231106&q=Quebec&days=1&aqi=no&alerts=no'))
+            'http://api.weatherapi.com/v1/forecast.json?key=f54f33c40a3f4c27b0431302231106&q=London&days=1&aqi=no&alerts=no'))
         .then((response) {
       setState(() {
         var json = jsonDecode(response.body);

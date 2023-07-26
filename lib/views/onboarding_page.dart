@@ -36,10 +36,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
         color: Colors.white,
         padding: EdgeInsets.only(bottom: 60),
         child: PageView(
+          
           onPageChanged: (index) {
             setState(() => isLastPage = index == 2);
           },
           controller: controller,
+          
           children: [
             GenerateOnboardingPage('onboardingImg1', onboardingTexts[0]),
             GenerateOnboardingPage('onboardingImg2', onboardingTexts[1]),
