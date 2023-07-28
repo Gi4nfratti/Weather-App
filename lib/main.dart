@@ -6,6 +6,7 @@ import 'package:weather/views/countries_list_page.dart';
 import 'package:weather/views/home_page.dart';
 import 'package:weather/views/next_days_page.dart';
 import 'package:weather/views/onboarding_page.dart';
+import 'package:weather/views/states_page.dart';
 
 Future main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.HOME: (context) => HomePage(),
         AppRoutes.NEXT_DAYS: (context) => NextDaysPage(),
         AppRoutes.COUNTRIES: (context) => CountriesListPage(),
+        AppRoutes.STATES: (context) => StatesPage(),
       },
     );
   }

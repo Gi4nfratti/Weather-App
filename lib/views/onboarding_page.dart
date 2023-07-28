@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:weather/dummy_data.dart';
@@ -24,6 +25,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    precacheImage(AssetImage('lib/images/onboardingImg1.jpg'), context);
+    precacheImage(AssetImage('lib/images/onboardingImg2.jpg'), context);
+    precacheImage(AssetImage('lib/images/onboardingImg3.jpg'), context);
+    super.didChangeDependencies();
+  }
+
+  @override
   void dispose() {
     controller.dispose();
     super.dispose();
@@ -36,12 +45,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
         color: Colors.white,
         padding: EdgeInsets.only(bottom: 60),
         child: PageView(
-          
           onPageChanged: (index) {
             setState(() => isLastPage = index == 2);
           },
           controller: controller,
-          
           children: [
             GenerateOnboardingPage('onboardingImg1', onboardingTexts[0]),
             GenerateOnboardingPage('onboardingImg2', onboardingTexts[1]),
@@ -58,11 +65,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 minimumSize: Size.fromHeight(60),
               ),
               onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                prefs.setBool('showHome', true);
-                SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-                    overlays: SystemUiOverlay.values);
-                Navigator.of(context).pushReplacementNamed(AppRoutes.HOME);
+                IsLocationAllowed().then((isAllowed) async {
+                  if (isAllowed) {
+                    final prefs = await SharedPreferences.getInstance();
+                    prefs.setBool('showHome', true);
+                    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+                        overlays: SystemUiOverlay.values);
+                    Navigator.of(context).pushReplacementNamed(AppRoutes.HOME);
+                  } else {
+                    IsLocationAllowed();
+                  }
+                });
               },
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -127,4 +140,26 @@ Widget GenerateOnboardingPage(String imgSource, String text) {
       ),
     ],
   );
+}
+
+Future<bool> IsLocationAllowed() async {
+  bool serviceEnabled;
+  LocationPermission permission;
+
+  serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) return false;
+
+  permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      return false;
+    }
+  }
+  if (permission == LocationPermission.deniedForever) {
+    Geolocator.openLocationSettings();
+    return false;
+  }
+
+  return true;
 }

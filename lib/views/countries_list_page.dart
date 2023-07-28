@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:country_state_city/country_state_city.dart' as countryP;
+import 'package:weather/utils/appRoutes.dart';
+
+import '../models/country.dart';
 
 class CountriesListPage extends StatefulWidget {
   const CountriesListPage({super.key});
@@ -9,7 +12,7 @@ class CountriesListPage extends StatefulWidget {
 }
 
 class _CountriesListPageState extends State<CountriesListPage> {
-  List<String> countriesList = [];
+  List<Country> countriesList = [];
 
   @override
   void initState() {
@@ -29,9 +32,18 @@ class _CountriesListPageState extends State<CountriesListPage> {
                   ? CircularProgressIndicator()
                   : ListView.builder(
                       itemCount: countriesList.length,
-                      itemBuilder: (context, index) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Text(countriesList[index]),
+                      itemBuilder: (context, index) => GestureDetector(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Text(countriesList[index].name,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 18,
+                              )),
+                        ),
+                        onTap: () => Navigator.of(context).pushNamed(
+                            AppRoutes.STATES,
+                            arguments: countriesList[index].isoCode),
                       ),
                     )),
         ),
@@ -42,7 +54,10 @@ class _CountriesListPageState extends State<CountriesListPage> {
   Future<void> retrieveCountriesList() async {
     await countryP.getAllCountries().then((value) {
       setState(() {
-        value.forEach((country) => countriesList.add(country.name));
+        value.forEach((country) => countriesList.add(Country(
+              name: country.name,
+              isoCode: country.isoCode,
+            )));
       });
     });
   }
