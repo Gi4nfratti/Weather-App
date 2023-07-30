@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import 'package:weather/models/forecast_day.dart';
 import 'package:weather/models/forecast_hour.dart';
-
-import '../models/forecast.dart';
+import 'package:weather/views/home_page.dart';
+import 'package:weather/auth/keysSecret.dart' as keysSecret;
+import 'package:pdf/widgets.dart' as pw;
 
 class NextDaysPage extends StatefulWidget {
   const NextDaysPage({super.key});
@@ -17,6 +19,8 @@ class NextDaysPage extends StatefulWidget {
 
 class _NextDaysPageState extends State<NextDaysPage> {
   final List<ForecastDay> forecastNextDays = [];
+  final format = new DateFormat('dd/MM');
+  final formatTime = new DateFormat.Hm();
   List<bool> _isOpen = [];
 
   @override
@@ -28,31 +32,27 @@ class _NextDaysPageState extends State<NextDaysPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(
+          actions: [
+            IconButton(
+                onPressed: GeneratePDF,
+                icon: Icon(Icons.picture_as_pdf_rounded))
+          ],
+        ),
         body: SafeArea(
-            child: SingleChildScrollView(
-          child: Container(
-            decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    begin: Alignment.bottomLeft,
-                    end: Alignment.topRight,
-                    colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.secondary,
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context).colorScheme.tertiary,
-                ])),
             child: forecastNextDays.length == 0
-                ? CircularProgressIndicator()
-                : Container(child: _createExpansionPanel()),
-          ),
-        )));
+                ? Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    child: Container(
+                        color: Colors.white, child: _createExpansionPanel()),
+                  )));
   }
 
   Future<void> getNextDaysForecast() async {
+    print(HomePage.country);
     await http
         .get(Uri.parse(
-            'https://api.weatherapi.com/v1/forecast.json?key=f54f33c40a3f4c27b0431302231106&q=London&days=3&aqi=no&alerts=no'))
+            'https://api.weatherapi.com/v1/forecast.json?key=${keysSecret.key}&q=${HomePage.country}&days=3&aqi=no&alerts=no'))
         .then((response) {
       setState(() {
         var json = jsonDecode(response.body);
@@ -70,16 +70,6 @@ class _NextDaysPageState extends State<NextDaysPage> {
             ),
           );
         }
-
-        print(forecastNextDays[0].avgTemp);
-        print(forecastNextDays[0].avghumidity);
-        print(forecastNextDays[0].date);
-        print(forecastNextDays[0].maxTemp);
-        print(forecastNextDays[0].minTemp);
-        print(forecastNextDays[0].totalPrecip);
-        print('\n\n\n\n');
-        print(
-            '${forecastNextDays[0].forecastHour[0].time} -- ${forecastNextDays[0].forecastHour[0].avgTemp}');
       });
     });
   }
@@ -97,11 +87,11 @@ class _NextDaysPageState extends State<NextDaysPage> {
   }
 
   ExpansionPanelList _createExpansionPanel() {
-    final format = new DateFormat('dd/MM');
     for (var i = 0; i < forecastNextDays.length; i++) {
       _isOpen.add(false);
     }
     return ExpansionPanelList(
+      elevation: 0,
       expandedHeaderPadding: EdgeInsets.symmetric(horizontal: 10),
       expansionCallback: (i, isExpanded) {
         setState(() {
@@ -110,11 +100,12 @@ class _NextDaysPageState extends State<NextDaysPage> {
       },
       children: forecastNextDays
           .map<ExpansionPanel>((item) => ExpansionPanel(
+                backgroundColor: Colors.white,
                 isExpanded: _isOpen[forecastNextDays.indexOf(item)],
                 canTapOnHeader: true,
                 headerBuilder: (context, isExpanded) => Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 18),
                   child: Text(format.format(DateTime.parse(item.date)),
                       style: TextStyle(
                           fontFamily: 'Poppins',
@@ -131,14 +122,13 @@ class _NextDaysPageState extends State<NextDaysPage> {
   }
 
   Widget MountDayForecastDetails(ForecastDay day) {
-    final format = new DateFormat.Hm();
     TextStyle style = TextStyle(
         fontFamily: 'Poppins', fontWeight: FontWeight.w300, fontSize: 18);
 
     return Center(
       child: Column(children: [
         Text("Temperatura Média: ${day.avgTemp}ºC", style: style),
-        Text("Umidade: ${day.avghumidity}", style: style),
+        Text("Umidade: ${day.avghumidity}%", style: style),
         Text("Mínima: ${day.minTemp}ºC", style: style),
         Text("Máxima: ${day.maxTemp}ºC", style: style),
         Text("Precipitação: ${day.totalPrecip}mm", style: style),
@@ -166,7 +156,7 @@ class _NextDaysPageState extends State<NextDaysPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                            format.format(DateTime.parse(
+                            formatTime.format(DateTime.parse(
                                 day.forecastHour[i].time.toString())),
                             style:
                                 TextStyle(fontFamily: 'Poppins', fontSize: 16)),
@@ -184,5 +174,53 @@ class _NextDaysPageState extends State<NextDaysPage> {
         ),
       ]),
     );
+  }
+
+  Future<void> GeneratePDF() async {
+    final textStyleTitle = pw.TextStyle(
+      font: pw.Font.helveticaBold(),
+      fontSize: 32,
+    );
+
+    final textStyle = pw.TextStyle(
+      font: pw.Font.helvetica(),
+      fontSize: 18,
+    );
+    final pdf = pw.Document();
+    for (var day in forecastNextDays) {
+      pdf.addPage(pw.Page(
+        build: (context) => pw.Center(
+            child: pw.Column(children: [
+          pw.Text(
+              '${HomePage.country} - ${format.format(DateTime.parse(day.date))}',
+              style: textStyleTitle,
+              textAlign: pw.TextAlign.center),
+          pw.Text('Mínima: ${day.minTemp}ºC',
+              style: textStyleTitle, textAlign: pw.TextAlign.center),
+          pw.Text('Máxima: ${day.maxTemp}ºC',
+              style: textStyleTitle, textAlign: pw.TextAlign.center),
+          pw.Text('Umidade: ${day.avghumidity}%',
+              style: textStyleTitle, textAlign: pw.TextAlign.center),
+          pw.Text('Precipitação: ${day.totalPrecip}mm',
+              style: textStyleTitle, textAlign: pw.TextAlign.center),
+          pw.SizedBox(height: 20),
+          pw.ListView(
+              children: day.forecastHour
+                  .map((hour) => pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          mainAxisAlignment: pw.MainAxisAlignment.center,
+                          children: [
+                            pw.Text(
+                                formatTime.format(DateTime.parse(hour.time)),
+                                style: textStyle),
+                            pw.SizedBox(width: 50),
+                            pw.Text(hour.avgTemp, style: textStyle),
+                          ]))
+                  .toList()),
+        ])),
+      ));
+    }
+    await Printing.sharePdf(
+        bytes: await pdf.save(), filename: 'forecast-${HomePage.country}.pdf');
   }
 }
