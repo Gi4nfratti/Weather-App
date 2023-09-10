@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:weather/dummy_data.dart';
+import 'package:weather/const_texts.dart';
 import 'package:weather/utils/appRoutes.dart';
 
 class OnboardingPage extends StatefulWidget {

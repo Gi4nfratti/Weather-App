@@ -1,14 +1,13 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
+import 'package:weather/controllers/nextdayspage_controller.dart';
 import 'package:weather/models/forecast_day.dart';
-import 'package:weather/models/forecast_hour.dart';
-import 'package:weather/views/home_page.dart';
-import 'package:weather/auth/keysSecret.dart' as keysSecret;
 import 'package:pdf/widgets.dart' as pw;
+
+import '../store/forecast_store.dart';
 
 class NextDaysPage extends StatefulWidget {
   const NextDaysPage({super.key});
@@ -18,15 +17,17 @@ class NextDaysPage extends StatefulWidget {
 }
 
 class _NextDaysPageState extends State<NextDaysPage> {
-  final List<ForecastDay> forecastNextDays = [];
+  bool _isLoading = false;
+  NextDaysPageController controller = NextDaysPageController();
   final format = new DateFormat('dd/MM');
   final formatTime = new DateFormat.Hm();
   List<bool> _isOpen = [];
-
+  late ForecastStore store;
   @override
-  void initState() {
-    getNextDaysForecast();
-    super.initState();
+  void didChangeDependencies() async {
+    store = Provider.of<ForecastStore>(context);
+    store.UpdateNextDays();
+    super.didChangeDependencies();
   }
 
   @override
@@ -34,74 +35,54 @@ class _NextDaysPageState extends State<NextDaysPage> {
     return Scaffold(
         appBar: AppBar(
           actions: [
-            IconButton(
-                onPressed: GeneratePDF,
-                icon: Icon(Icons.picture_as_pdf_rounded))
+            _isLoading
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 0, 10, 0),
+                    child: Center(
+                      child: SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    onPressed: GeneratePDF,
+                    icon: Icon(Icons.picture_as_pdf_rounded))
           ],
         ),
-        body: SafeArea(
-            child: forecastNextDays.length == 0
-                ? Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    child: Container(
-                        color: Colors.white, child: _createExpansionPanel()),
-                  )));
+        body: Observer(
+          builder: (context) => SafeArea(
+              child: store.forecastNextDays.length == 0
+                  ? Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      child: Container(
+                          color: Colors.white,
+                          child: _createExpansionPanel(context)),
+                    )),
+        ));
   }
 
-  Future<void> getNextDaysForecast() async {
-    print(HomePage.country);
-    await http
-        .get(Uri.parse(
-            'https://api.weatherapi.com/v1/forecast.json?key=${keysSecret.key}&q=${HomePage.country}&days=3&aqi=no&alerts=no'))
-        .then((response) {
-      setState(() {
-        var json = jsonDecode(response.body);
-        var forecastList = json['forecast']['forecastday'];
-        for (var forecast in forecastList) {
-          forecastNextDays.add(
-            ForecastDay(
-              date: forecast['date'],
-              avgTemp: forecast['day']['avgtemp_c'],
-              avghumidity: forecast['day']['avghumidity'],
-              maxTemp: forecast['day']['maxtemp_c'],
-              minTemp: forecast['day']['mintemp_c'],
-              totalPrecip: forecast['day']['totalprecip_mm'],
-              forecastHour: _setForecastHourList(forecast),
-            ),
-          );
-        }
-      });
-    });
-  }
-
-  List<ForecastHour> _setForecastHourList(dynamic forecastDay) {
-    List<ForecastHour> forecastHour = [];
-
-    for (var hour in forecastDay['hour']) {
-      forecastHour.add(ForecastHour(
-          time: hour['time'],
-          icon: Icon(Icons.cloud),
-          avgTemp: hour['temp_c'].toString()));
-    }
-    return forecastHour;
-  }
-
-  ExpansionPanelList _createExpansionPanel() {
-    for (var i = 0; i < forecastNextDays.length; i++) {
+  ExpansionPanelList _createExpansionPanel(BuildContext context) {
+    final store = Provider.of<ForecastStore>(context);
+    for (var i = 0; i < store.forecastNextDays.length; i++) {
       _isOpen.add(false);
     }
     return ExpansionPanelList(
-      elevation: 0,
+      elevation: 1,
       expandedHeaderPadding: EdgeInsets.symmetric(horizontal: 10),
       expansionCallback: (i, isExpanded) {
         setState(() {
           _isOpen[i] = !isExpanded;
         });
       },
-      children: forecastNextDays
+      children: store.forecastNextDays
           .map<ExpansionPanel>((item) => ExpansionPanel(
                 backgroundColor: Colors.white,
-                isExpanded: _isOpen[forecastNextDays.indexOf(item)],
+                isExpanded: _isOpen[store.forecastNextDays.indexOf(item)],
                 canTapOnHeader: true,
                 headerBuilder: (context, isExpanded) => Padding(
                   padding:
@@ -161,7 +142,10 @@ class _NextDaysPageState extends State<NextDaysPage> {
                             style:
                                 TextStyle(fontFamily: 'Poppins', fontSize: 16)),
                         SizedBox(height: 5),
-                        day.forecastHour[i].icon,
+                        Image.network(
+                          'https:${day.forecastHour[i].iconURL}',
+                          cacheHeight: 32,
+                        ),
                         SizedBox(height: 5),
                         Text("${day.forecastHour[i].avgTemp}ºC",
                             style:
@@ -177,6 +161,7 @@ class _NextDaysPageState extends State<NextDaysPage> {
   }
 
   Future<void> GeneratePDF() async {
+    setState(() => _isLoading = true);
     final textStyleTitle = pw.TextStyle(
       font: pw.Font.helveticaBold(),
       fontSize: 32,
@@ -187,12 +172,12 @@ class _NextDaysPageState extends State<NextDaysPage> {
       fontSize: 18,
     );
     final pdf = pw.Document();
-    for (var day in forecastNextDays) {
+    for (var day in store.forecastNextDays) {
       pdf.addPage(pw.Page(
         build: (context) => pw.Center(
             child: pw.Column(children: [
           pw.Text(
-              '${HomePage.country} - ${format.format(DateTime.parse(day.date))}',
+              '${store.country} - ${format.format(DateTime.parse(day.date))}',
               style: textStyleTitle,
               textAlign: pw.TextAlign.center),
           pw.Text('Mínima: ${day.minTemp}ºC',
@@ -221,6 +206,9 @@ class _NextDaysPageState extends State<NextDaysPage> {
       ));
     }
     await Printing.sharePdf(
-        bytes: await pdf.save(), filename: 'forecast-${HomePage.country}.pdf');
+            bytes: await pdf.save(), filename: 'forecast-${store.country}.pdf')
+        .whenComplete(() {
+      setState(() => _isLoading = false);
+    });
   }
 }

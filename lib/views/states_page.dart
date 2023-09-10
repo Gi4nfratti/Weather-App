@@ -1,65 +1,51 @@
 import 'package:flutter/material.dart';
-import 'package:country_state_city/country_state_city.dart' as statesP;
-import 'package:weather/utils/appRoutes.dart';
-import 'package:weather/views/home_page.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:provider/provider.dart';
+import 'package:weather/store/forecast_store.dart';
 
-class StatesPage extends StatefulWidget {
+import 'home_page.dart';
+
+class StatesPage extends StatelessWidget {
   StatesPage({super.key});
 
   @override
-  State<StatesPage> createState() => _StatesPageState();
-}
-
-class _StatesPageState extends State<StatesPage> {
-  List<String> statesList = [];
-
-  @override
-  void didChangeDependencies() {
-    String country = ModalRoute.of(context)?.settings.arguments as String;
-    retrieveStates(country);
-    super.didChangeDependencies();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(),
-        body: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Center(
-            child: statesList.length == 0
-                ? CircularProgressIndicator()
-                : ListView.builder(
-                    itemCount: statesList.length,
-                    itemBuilder: (context, index) => GestureDetector(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Text(statesList[index],
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 18,
-                              )),
-                        ),
-                        onTap: () => Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                                builder: (c) => HomePage(),
-                                settings: RouteSettings(
-                                    name: '/home',
-                                    arguments: statesList[index])),
-                            (route) => false))),
-          ),
-        ));
-  }
+    final args = ModalRoute.of(context)!.settings.arguments as String;
+    final store = Provider.of<ForecastStore>(context);
+    store.RetrieveStates(args);
 
-  Future<void> retrieveStates(String country) async {
-    try {
-      await statesP.getStatesOfCountry(country).then((value) {
-        setState(() {
-          value.forEach((state) => statesList.add(state.name));
-        });
-      });
-    } catch (ex) {
-      print(ex);
-    }
+    return Scaffold(
+      appBar: AppBar(),
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Observer(
+          builder: (context) => Center(
+              child: store.statesList.length == 0
+                  ? CircularProgressIndicator()
+                  : Observer(
+                      builder: (context) => ListView.builder(
+                          itemCount: store.statesList.length,
+                          itemBuilder: (context, index) => GestureDetector(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                child: Text(store.statesList[index],
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 18,
+                                    )),
+                              ),
+                              onTap: () {
+                                store.country = store.statesList[index];
+                                Navigator.of(context).pushAndRemoveUntil(
+                                    MaterialPageRoute(
+                                        builder: (c) => HomePage(),
+                                        settings: RouteSettings(name: '/home')),
+                                    (route) => false);
+                              })),
+                    )),
+        ),
+      ),
+    );
   }
 }

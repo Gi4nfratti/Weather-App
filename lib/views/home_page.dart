@@ -1,48 +1,33 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:printing/printing.dart';
-import 'package:weather/models/forecast_hour.dart';
+import 'package:provider/provider.dart';
+import 'package:weather/store/forecast_store.dart';
 import 'package:weather/utils/appRoutes.dart';
-import 'package:weather/auth/keysSecret.dart' as keysSecret;
 import 'package:pdf/widgets.dart' as pw;
 
 class HomePage extends StatefulWidget {
-  static String country = "";
   HomePage({super.key});
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<ForecastHour> forecastHour = [];
-  int focusedHourForecast = 0;
-  bool isAllowed = false;
-  String avgTemp = "";
-
-  @override
-  void didChangeDependencies() {
-    if (ModalRoute.of(context)?.settings.arguments == null) {
-      GetCountryByLocation().then((value) {
-        HomePage.country = value!;
-        getTodaysWeather(HomePage.country);
-      });
-    } else {
-      HomePage.country = ModalRoute.of(context)?.settings.arguments as String;
-      getTodaysWeather(HomePage.country);
-    }
-    super.didChangeDependencies();
-  }
+  late ForecastStore store;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
+    store = Provider.of<ForecastStore>(context);
+    store.UpdateLocation().whenComplete(() => store.UpdateForecast());
+    TextStyle forecastHourStyle =
+        TextStyle(fontFamily: 'Poppins', fontSize: 16);
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Container(
+      body: Observer(
+        builder: (context) => Container(
           decoration: BoxDecoration(
               gradient: LinearGradient(
                   begin: Alignment.bottomLeft,
@@ -53,7 +38,7 @@ class _HomePageState extends State<HomePage> {
                 Theme.of(context).colorScheme.primaryContainer,
                 Theme.of(context).colorScheme.tertiary,
               ])),
-          child: HomePage.country.isEmpty
+          child: store.country.isEmpty
               ? Center(
                   child: CircularProgressIndicator(
                   color: Colors.white,
@@ -67,14 +52,14 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            HomePage.country,
+                            store.country,
                             style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            avgTemp,
+                            store.avgTemp,
                             style: TextStyle(color: Colors.white, fontSize: 68),
                           ),
                         ],
@@ -88,7 +73,7 @@ class _HomePageState extends State<HomePage> {
                             child: SizedBox(
                               height: 100,
                               width: MediaQuery.of(context).size.width - 100,
-                              child: forecastHour.length == 0
+                              child: store.forecastHour.length == 0
                                   ? Center(
                                       child: SizedBox(
                                       height: 20,
@@ -101,18 +86,19 @@ class _HomePageState extends State<HomePage> {
                                   : PageView.builder(
                                       scrollDirection: Axis.horizontal,
                                       padEnds: false,
-                                      itemCount: forecastHour.length,
+                                      itemCount: store.forecastHour.length,
                                       controller: PageController(
-                                        initialPage: focusedHourForecast,
+                                        initialPage: store.focusedHourForecast,
                                         viewportFraction: 0.5,
                                       ),
                                       itemBuilder: (context, i) {
                                         return Transform.translate(
                                           offset: Offset.zero,
                                           child: Card(
-                                            color: Color(0xBBFFFFFF),
-                                            shadowColor: Color(0xAA000000),
-                                            elevation: 7,
+                                            color: const Color(0xBBFFFFFF),
+                                            shadowColor:
+                                                const Color(0xAA000000),
+                                            elevation: 6,
                                             shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(10)),
@@ -123,17 +109,18 @@ class _HomePageState extends State<HomePage> {
                                               mainAxisAlignment:
                                                   MainAxisAlignment.center,
                                               children: [
-                                                Text(forecastHour[i].time,
-                                                    style: TextStyle(
-                                                        fontFamily: 'Poppins',
-                                                        fontSize: 16)),
+                                                Text(store.forecastHour[i].time,
+                                                    style: forecastHourStyle),
                                                 SizedBox(height: 5),
-                                                forecastHour[i].icon,
+                                                Image.network(
+                                                  'https:${store.forecastHour[i].iconURL}',
+                                                  cacheHeight: 32,
+                                                ),
                                                 SizedBox(height: 5),
-                                                Text(forecastHour[i].avgTemp,
-                                                    style: TextStyle(
-                                                        fontFamily: 'Poppins',
-                                                        fontSize: 16))
+                                                Text(
+                                                    store.forecastHour[i]
+                                                        .avgTemp,
+                                                    style: forecastHourStyle)
                                               ],
                                             )),
                                           ),
@@ -143,33 +130,28 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         Container(
-                          color: Colors.black,
                           child: ButtonBar(
                             alignment: MainAxisAlignment.spaceAround,
                             children: [
-                              IconButton(
-                                  onPressed: () => Navigator.of(context)
-                                      .pushNamed(AppRoutes.NEXT_DAYS),
-                                  icon: Icon(
-                                    Icons.calendar_month_outlined,
-                                    color: Colors.white,
-                                    size: 32,
-                                  )),
-                              IconButton(
-                                  onPressed: () => Navigator.of(context)
-                                      .pushNamed(AppRoutes.COUNTRIES),
-                                  icon: Icon(
-                                    Icons.public_rounded,
-                                    color: Colors.white,
-                                    size: 32,
-                                  )),
-                              IconButton(
-                                  onPressed: () => GeneratePDF(),
-                                  icon: Icon(
-                                    Icons.picture_as_pdf_rounded,
-                                    color: Colors.white,
-                                    size: 32,
-                                  )),
+                              generateIconButton(
+                                () => Navigator.of(context)
+                                    .pushNamed(AppRoutes.NEXT_DAYS),
+                                Icons.calendar_month_outlined,
+                              ),
+                              generateIconButton(
+                                () => Navigator.of(context)
+                                    .pushNamed(AppRoutes.COUNTRIES),
+                                Icons.public_rounded,
+                              ),
+                              _isLoading
+                                  ? CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 3,
+                                    )
+                                  : generateIconButton(
+                                      () => GeneratePDF(),
+                                      Icons.picture_as_pdf_rounded,
+                                    ),
                             ],
                           ),
                         )
@@ -182,36 +164,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> getTodaysWeather(String country) async {
-    forecastHour.clear();
-    await http
-        .get(Uri.parse(
-            'http://api.weatherapi.com/v1/forecast.json?key=${keysSecret.key}&q=${country}&days=1&aqi=no&alerts=no'))
-        .then((response) {
-      setState(() {
-        var json = jsonDecode(response.body);
-        for (var hour in json['forecast']['forecastday'][0]['hour']) {
-          forecastHour.add(ForecastHour(
-              avgTemp: '${hour['temp_c']}ºC',
-              time: (hour['time'] as String).substring(11),
-              icon: Icon(Icons.cloud_outlined)));
-        }
-        avgTemp = '${json['current']['temp_c']}ºC';
-        var lastUpdated =
-            (json['current']['last_updated'] as String).substring(11, 13);
-        focusedHourForecast = forecastHour
-            .indexWhere((e) => e.time.substring(0, 2) == lastUpdated);
-      });
-    });
-  }
-
-  Future<String?> GetCountryByLocation() async {
-    final v = await Geolocator.getCurrentPosition();
-    var addr = await placemarkFromCoordinates(v.latitude, v.longitude);
-    return addr[0].administrativeArea;
+  IconButton generateIconButton(Function() func, IconData icon) {
+    return IconButton(
+      onPressed: func,
+      icon: Icon(
+        icon,
+        color: Colors.grey.shade800,
+        weight: 20,
+        size: 32,
+      ),
+    );
   }
 
   Future<void> GeneratePDF() async {
+    setState(() => _isLoading = true);
     final textStyleTitle = pw.TextStyle(
       font: pw.Font.helveticaBold(),
       fontSize: 42,
@@ -226,10 +192,10 @@ class _HomePageState extends State<HomePage> {
       pw.Page(
         build: (pw.Context context) => pw.Center(
             child: pw.Column(children: [
-          pw.Text('${HomePage.country} - ${avgTemp}', style: textStyleTitle),
+          pw.Text('${store.country} - ${store.avgTemp}', style: textStyleTitle),
           pw.SizedBox(height: 20),
           pw.ListView(
-              children: forecastHour
+              children: store.forecastHour
                   .map((hour) => pw.Row(
                           crossAxisAlignment: pw.CrossAxisAlignment.center,
                           mainAxisAlignment: pw.MainAxisAlignment.center,
@@ -244,6 +210,9 @@ class _HomePageState extends State<HomePage> {
     );
 
     await Printing.sharePdf(
-        bytes: await pdf.save(), filename: 'forecast-${HomePage.country}.pdf');
+            bytes: await pdf.save(), filename: 'forecast-${store.country}.pdf')
+        .whenComplete(() {
+      setState(() => _isLoading = false);
+    });
   }
 }
